@@ -1,0 +1,662 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+#Analysis Results- 
+
+	1) People who claim do not normally cancel - people who claim and don't cancel (70%) is more than double of who claim and cancel(30%)
+	2) People with slightly longer length of residence tend to cancel less
+	3) Of those who have cancelled, 56% have medium or low credit. Of the low credit people, 45% have cancelled
+	4) Not much insights from color. Overall, most people have white houses while very few of them have yellow houses
+	5) Outliers in age replaced with 99.9% value. On an average, people who don't cancel have higher average age(44.14) when compared to people who cancel(42.04)
+	6) People who taken the policy in 2014 have more cancellations(31%) followed by 2015(26%)
+	7) 50021 (Ankeny, IA ) have the highest no. of policies and cancellation is ~17%. Places like 20102 have more cancellations (15/24 -> cancel/total), 20148 (10/17). Places like 20135 have higher % of cancellations (7/17)
+	8) Of the people who are cancelling, most of them (55%) stay in house
+	9) Number of children in "house" is higher
+	10) 95% of those who cancelled have 9 children while who did not cancel have 6 children
+	11) Not much difference in coverage type
+When compared to broker, online and phone sales channel have more cancellations. Of the people who took policy through broker have very less cancellations (18%)
+
+
+# Loading datasets
+```{r}
+train <- read.csv('E:/Projects/Travellers/2017travelerscasecompetition/Train.csv',header= TRUE,na.strings="NA")
+
+train <- read.csv('D:/Jack/J_Student/Travelers Case Study/Train.csv',header= TRUE,na.strings="NA")
+
+str(train)
+
+# Plotting correlation matrix
+cor(train_num)
+
+```
+
+
+# Missing Value Treatment
+```{r}
+#=================Missing Value Identification====================#
+Missing_Value <- as.data.frame(which(is.na(train), arr.ind=TRUE))
+Missing_Value_Count <- as.data.frame(table(Missing_Value[,2]))
+nrow(train)
+
+#---Check datatype of all variable
+Missing_Col_Type <- as.data.frame(sapply(train[,unique(Missing_Value[,2])], typeof))
+
+Names <- colnames(train)
+Missing_Val_Col <- Names[unique(Missing_Value[,2])]
+Missing_Values  <- cbind(Missing_Val_Col,Missing_Value_Count[,1], Missing_Value_Count[,2], Missing_Col_Type)
+rownames(Missing_Values) <- NULL
+colnames(Missing_Values) <- c("Col_Name", "Col_Index", "Missing_Count", "Col_Type")
+
+#=====================Missing Value Treatment=====================#
+#------Remove------#
+Missing_Treated_Rem <- train[complete.cases(train), ]
+nrow(Missing_Treated_Rem)
+
+#------Impute Median - numeric columns------#
+
+library(plyr)
+impute.med <- function(x) replace(x, is.na(x), median(x, na.rm = TRUE))
+Imp_train_Med <- sapply(train[,c(2,3,4,5,7,8,12,15,17)], function(x){
+  if(is.numeric(x)){
+    impute.med(x)
+  } else {
+    x
+  }
+}
+)
+
+Imp_train_Med <- as.data.frame(Imp_train_Med)
+
+train_Med <- cbind(Train[,c(1,6,9,10,11,13,14,16,18)], Imp_train_Med)
+#------Impute Mean - numeric columns------#
+
+#library(plyr)
+impute.mean <- function(x) replace(x, is.na(x), mean(x, na.rm = TRUE))
+Imp_train_Mean <- sapply(train[,c(2,3,4,5,7,8,12,15,17)], function(x){
+  if(is.numeric(x)){
+    impute.mean(x)
+  } else {
+    x
+  }
+}
+)
+
+Imp_train_Mean <- as.data.frame(Imp_train_Mean)
+
+train_Mean <- cbind(train[,c(1,6,9,10,11,13,14,16,18)], Imp_train_Mean)
+```
+
+# Remove Na after Imputation
+
+```{r}
+train_nona <- na.omit(train_Med)
+#train_nona <- train[complete.cases(train),]
+```
+
+```{r}
+##=====Check=====##
+sum(is.na(train_nona)) #------- 0
+summary(train_nona)
+
+```
+
+```{r}
+#---Check datatype of all variable
+sapply(train_nona, typeof)
+```
+
+
+
+```{r}
+#=====================Check Correlation===========================#
+install.packages("corrplot")
+library(corrplot)
+Cor_Missing_Treated <- cor(train_nona[,c(-1,-2,-3,-4,-5,-6, -7)])
+
+corrplot(Cor_Missing_Treated, type ="upper", order = "hclust", t1.col = "black", t1.srt = 45)
+
+par(mfrow = c(1,1))
+chart.Correlation(Missing_Treated[,c(-6,-9,-10,-11,-13,-14)], histogram =  TRUE, pch = 19)
+
+col <- colorRampPalette(c("blue", "white", "red"))(20)
+heatmap(Cor_Missing_Treated, col=col, symm = TRUE)
+```
+
+
+
+
+
+
+#Univariate and Bivariate analyses
+
+```{r}
+# length at residence
+boxplot(len.at.res~cancel,data=train_nona)
+quantile(train_nona[train_nona$cancel==0,"len.at.res"],c(0,0.05,.25,.50,.75,.90,.95,.99))
+quantile(train_nona[train_nona$cancel==1,"len.at.res"],c(0,0.05,.25,.50,.75,.90,.95,.99))
+max(train_nona[train_nona$cancel==0,"len.at.res"])
+max(train_nona[train_nona$cancel==1,"len.at.res"])
+
+mean(train_nona[train_nona$cancel==0,"len.at.res"])
+mean(train_nona[train_nona$cancel==1,"len.at.res"])
+
+min(train_nona$len.at.res)
+sum(train_nona$len.at.res>28)
+
+
+```
+
+
+```{r}
+# Credit
+table_credit <- table(train_nona$cancel,train_nona$credit)
+print(table_credit)
+round(prop.table(table_credit),2)
+round(prop.table(table_credit,1),2)
+round(prop.table(table_credit,2),2)
+
+
+```
+
+
+```{r}
+# house color
+table_color <- table(train_nona$cancel,train_nona$house.color)
+print(table_color)
+round(prop.table(table_color),2)
+round(prop.table(table_color,1),2)
+round(prop.table(table_color,2),2)
+
+```
+
+```{r}
+# age
+boxplot(ni.age~cancel,data=train_nona)
+
+quantile(train_nona$ni.age,c(0,0.05,.25,.50,.75,.90,.95,.99,0.999))
+
+quantile(train_nona[train_nona$cancel==0,"ni.age"],c(0,0.05,.25,.50,.75,.90,.95,.99,0.999))
+quantile(train_nona[train_nona$cancel==1,"ni.age"],c(0,0.05,.25,.50,.75,.90,.95,.99,0.999))
+
+max(train_nona[train_nona$cancel==0,"ni.age"])
+max(train_nona[train_nona$cancel==1,"ni.age"])
+
+mean(train_nona[train_nona$cancel==0,"ni.age"])
+mean(train_nona[train_nona$cancel==1,"ni.age"])
+
+# replacing outliers (>99.9% with 99.9% value)
+train_nona_agemod <- train_nona
+train_nona_agemod[train_nona_agemod$ni.age>101.056,"ni.age"] <- 101.056
+
+boxplot(ni.age~cancel,data=train_nona_agemod)
+
+```
+
+
+```{r}
+# year
+table_year <- table(train_nona$cancel,train_nona$year)
+print(table_year)
+round(prop.table(table_year),2)
+round(prop.table(table_year,1),2)
+round(prop.table(table_year,2),2)
+
+```
+
+```{r}
+# Zipcode
+table_zipcode <- as.data.frame.matrix(table(train_nona$zip.code,train_nona$cancel))
+
+
+prop_table_zipcode_col <- as.data.frame.matrix(round(prop.table(table(train_nona$zip.code,train_nona$cancel),2),2))
+
+# normalized/weighted row-wise proportion 
+table_zipcode_norm <- table_zipcode
+table_zipcode_norm[,2] <- round(exp(table_zipcode[,2])/(exp(table_zipcode[,2]) +exp(table_zipcode[,3]) ),2)
+table_zipcode_norm[,3] <- round(exp(table_zipcode[,3])/(exp(table_zipcode[,2]) +exp(table_zipcode[,3]) ),2)
+
+
+```
+
+
+```{r}
+# Dwelling Type
+table_dwel <- table(train_nona$cancel,train_nona$dwelling.type)
+print(table_dwel)
+round(prop.table(table_dwel),2)
+round(prop.table(table_dwel,1),2)
+round(prop.table(table_dwel,2),2)
+
+
+aggregate(n.children ~ dwelling.type+cancel,data = train_nona,FUN=length)
+
+```
+
+
+```{r}
+# coverage type
+
+table_cov <- table(train_nona$cancel,train_nona$coverage.type)
+print(table_cov)
+round(prop.table(table_cov),2)
+round(prop.table(table_cov,1),2)
+round(prop.table(table_cov,2),2)
+
+
+# coverage type and credit
+table_cov_cred <- table(train_nona$credit,train_nona$coverage.type)
+print(table_cov_cred)
+round(prop.table(table_cov_cred),2)
+round(prop.table(table_cov_cred,1),2)
+round(prop.table(table_cov_cred,2),2)
+
+# coverage type and premium
+boxplot(premium ~ credit,data=train_nona )
+
+```
+
+```{r}
+# Sales channel
+table_sales <- table(train_nona$cancel,train_nona$sales.channel)
+print(table_sales)
+round(prop.table(table_sales),2)
+round(prop.table(table_sales,1),2)
+round(prop.table(table_sales,2),2)
+
+
+```
+
+```{r}
+# Premium
+
+boxplot(premium ~ cancel,data = train_nona)
+quantile(train_nona$premium,c(0,0.05,.25,.50,.75,.90,.95,.99,0.999))
+
+quantile(train_nona[train_nona$cancel==0,"premium"],c(0,0.05,.25,.50,.75,.90,.95,.99,0.999))
+quantile(train_nona[train_nona$cancel==1,"premium"],c(0,0.05,.25,.50,.75,.90,.95,.99,0.999))
+
+
+```
+
+
+```{r}
+
+boxplot( n.children ~ cancel, data = train_nona)
+tapply(train_nona$n.children,train_nona$cancel,quantile,probs = c(0,0.05,.25,.50,.75,.90,.95,.99,0.999))
+
+```
+# Create derived columns using transformations
+
+```{r}
+train_nona$premium1 <- log(train_nona$premium)
+#train_nona$premium2 <- exp(train_nona$premium)
+train_nona$premium3 <- sqrt(train_nona$premium)
+train_nona$premium4 <- (train_nona$premium)^0.3333
+train_nona$premium5 <- (train_nona$premium)^2
+train_nona$premium6 <- (train_nona$premium)^3
+
+
+
+train_nona$tenure2 <- exp(train_nona$tenure)
+train_nona$tenure3 <- sqrt(train_nona$tenure)
+train_nona$tenure4 <- (train_nona$tenure)^0.3333
+train_nona$tenure5 <- (train_nona$tenure)^2
+train_nona$tenure6 <- (train_nona$tenure)^3
+
+train_nona$n.adults2 <- exp(train_nona$n.adults)
+train_nona$n.adults3 <- sqrt(train_nona$n.adults)
+train_nona$n.adults4 <- (train_nona$n.adults)^0.3333
+train_nona$n.adults5 <- (train_nona$n.adults)^2
+train_nona$n.adults6 <- (train_nona$n.adults)^3
+
+train_nona$n.children2 <- exp(train_nona$n.children)
+train_nona$n.children3 <- sqrt(train_nona$n.children)
+train_nona$n.children4 <- (train_nona$n.children)^0.3333
+train_nona$n.children5 <- (train_nona$n.children)^2
+train_nona$n.children6 <- (train_nona$n.children)^3
+
+
+train_nona$len.at.res2 <- exp(train_nona$len.at.res)
+train_nona$len.at.res3 <- sqrt(train_nona$len.at.res)
+train_nona$len.at.res4 <- (train_nona$len.at.res)^0.3333
+train_nona$len.at.res5 <- (train_nona$len.at.res)^2
+train_nona$len.at.res6 <- (train_nona$len.at.res)^3
+
+
+train_nona$ni.age2 <- exp(train_nona$ni.age)
+train_nona$ni.age3 <- sqrt(train_nona$ni.age)
+train_nona$ni.age4 <- (train_nona$ni.age)^0.3333
+train_nona$ni.age5 <- (train_nona$ni.age)^2
+train_nona$ni.age6 <- (train_nona$ni.age)^3
+```
+
+# Adding Z-score for continuous variables
+
+```{r}
+train_nona$tenureZscore = (train_nona$tenure-mean(train_nona$tenure))/sd(train_nona$tenure)
+hist(train_nona$tenure)
+hist(train_nona$tenureZscore)
+
+train_nona$premiumZscore = (train_nona$premium-mean(train_nona$premium))/sd(train_nona$premium)
+hist(train_nona$premium)
+hist(train_nona$premiumZscore)
+
+train_nona$len.at.resZscore = (train_nona$len.at.res-mean(train_nona$len.at.res))/sd(train_nona$len.at.res)
+hist(train_nona$len.at.res)
+hist(train_nona$len.at.resZscore)
+
+train_nona$ni.ageZscore = (train_nona$ni.age-mean(train_nona$ni.age))/sd(train_nona$ni.age)
+hist(train_nona$ni.age)
+hist(train_nona$ni.ageZscore)
+
+train_nona$n.childrenZscore = (train_nona$n.children-mean(train_nona$n.children))/sd(train_nona$n.children)
+hist(train_nona$n.children)
+hist(train_nona$n.childrenZscore)
+
+train_nona$n.adultsZscore = (train_nona$n.adults-mean(train_nona$n.adults))/sd(train_nona$n.adults)
+hist(train_nona$n.adults)
+hist(train_nona$n.adultsZscore)
+
+```
+
+# Bining Continuous variables
+
+```{r}
+colnames(train_nona)
+```
+
+
+
+# Outlier Analysis of Z-Scores
+
+```{r}
+# tenure
+
+boxplot(tenureZscore~cancel,data=train_nona)
+tapply(train_nona$tenureZscore,train_nona$cancel,quantile,probs = c(0,0.05,.25,.50,.75,.90,.95,.99,0.999))
+# No outliers in Tenure
+
+```
+
+```{r}
+# Length at Residence
+
+boxplot(len.at.resZscore~cancel,data=train_nona)
+tapply(train_nona$len.at.resZscore,train_nona$cancel,quantile,probs = c(0,0.05,.25,.50,.75,.90,.95,.99,0.997,0.999))
+min(train_nona$len.at.resZscore)
+max(train_nona$len.at.resZscore)
+
+min(train_nona$len.at.res)
+# The outliers are <50 years which sounds reasonable, hence the outliers have not been capped/ removed
+
+```
+
+
+```{r}
+# Premium
+
+boxplot(premiumZscore~cancel,data=train_nona)
+tapply(train_nona$premiumZscore,train_nona$cancel,quantile,probs = c(0,0.05,.25,.50,.75,.90,.95,.99,0.999))
+
+max(train_nona$premiumZscore)
+min(train_nona$premiumZscore)
+
+#The outliers for premium are >$1100 and <=$1165, they seem to be reasonable premiums, hence we are not removing/ capping the outliers
+
+```
+
+```{r}
+# Age
+
+boxplot(ni.ageZscore~cancel,data=train_nona)
+quantile(train_nona$ni.ageZscore,probs = c(0,0.05,.25,.50,.75,.90,.95,.99,0.997,0.999))
+tapply(train_nona$ni.ageZscore,train_nona$cancel,quantile,probs = c(0,0.05,.25,.50,.75,.90,.95,.99,0.999))
+
+max(train_nona$ni.age)
+
+#Capping >99.7% values to 99.7% value (3.38591475 - Zscore())
+
+train_treated <- train_nona
+train_treated[train_treated$ni.ageZscore>3.38591475,"ni.ageZscore"] <- quantile(train_nona$ni.ageZscore,probs = 0.997)
+min(train_treated$ni.ageZscore)
+
+```
+
+
+# Identifying Bins
+
+```{r}
+# Overall
+install.packages("party")
+library("party")
+ten <- ctree(cancel ~ tenureZscore + ni.ageZscore+ premium+len.at.resZscore + n.childrenZscore + n.adultsZscore, data = train_treated,controls = ctree_control(minbucket = 1L))
+plot(ten,type="simple")
+
+
+# Tenure
+quantile(train_treated$tenureZscore,probs = c(0,0.05,.25,.50,.75,.90,.95,.99,0.999))
+train_treated$tenure_bins <- ifelse(train_treated$tenureZscore < -0.95, "<(-0.95)", ifelse(train_treated$tenureZscore>=-0.95 & train_treated$tenureZscore<=0.20, "(-0.95)-0.20", ifelse(train_treated$tenureZscore>0.20 & train_treated$tenureZscore<=0.72, "0.20-0.71", ifelse(train_treated$tenureZscore>0.72,">0.72","NA"))))
+barplot(table(train_treated$tenure_bins))
+
+```
+
+
+
+
+```{r}
+# Premium
+quantile(train_treated$premiumZscore,probs = c(0,0.05,.25,.50,.75,.90,.95,.99,0.999))
+train_treated$premium_bins <- ifelse(train_treated$premiumZscore<=-0.715, " <=(-0.715)", ifelse(train_treated$premiumZscore>-0.715 & train_treated$premiumZscore<=0.0025, "(-0.715)-0.0025", ifelse(train_treated$premiumZscore>0.0025 & train_treated$premiumZscore<=0.71, "0.0025-0.71",  ifelse(train_treated$premiumZscore>0.71,">0.71","NA"))))
+barplot(table(train_treated$premium_bins))
+
+
+```
+
+```{r}
+# Age 
+quantile(train_treated$ni.ageZscore,probs = c(0,0.05,.25,.50,.75,.90,.95,.99,0.999))
+train_treated$age_bins <- ifelse(train_treated$ni.ageZscore<=-0.72,"<=-0.72", ifelse(train_treated$ni.ageZscore>-0.72 & train_treated$ni.ageZscore<=-0.05,"-0.72-(-0.05)", ifelse(train_treated$ni.ageZscore>-0.05 & train_treated$ni.ageZscore<=0.63, "-0.05-0.63", ifelse(train_treated$ni.ageZscore>0.63,">0.63","NA"))))
+barplot(table(train_treated$age_bins))
+
+```
+
+
+
+
+```{r}
+# length at residence 
+
+quantile(train_treated$len.at.res,probs = c(0,0.05,.25,0.33,0.4,.50,0.66,.75,.90,.95,.99,0.999))
+quantile(train_treated$len.at.resZscore,probs = c(0,0.05,.25,0.33,0.4,.50,0.66,.75,.90,.95,.99,0.999))
+train_treated$len.at.res_bins <- ifelse(train_treated$len.at.resZscore<=-0.7,"<=(-0.7)",ifelse(train_treated$len.at.resZscore>-0.7 & train_treated$len.at.resZscore<(-0.04),"(-0.7)-(-0.04)",ifelse(train_treated$len.at.resZscore>=-0.04 & train_treated$len.at.resZscore<=0.616,"-0.04-0.616",ifelse(train_treated$len.at.resZscore>0.616, ">0.616","NA"))))
+barplot(table(train_treated$len.at.res_bins))
+
+
+hist(train_treated$len.at.res,breaks = seq(min(train_treated$len.at.res),max(train_treated$len.at.res),length.out=5))
+```
+
+
+# Splitting data
+
+```{r}
+train_Split <- subset(train_nona, train_nona$cancel != -1)
+
+colnames(train_Split)
+#Check
+unique(train_Split$cancel)
+ncol(train_nona)
+
+colnames(train_treated)
+
+data <- train_treated[,c(1:18,49:58)]
+
+data_factor <- data %>% mutate_if(is.character, factor)
+
+sapply(cat, class)
+
+#-----Test-----3
+colnames(data_factor)
+data_cat <- data_factor[,c(1:9,11:14,18,25:28)]
+
+# Reordering columns
+data_cat <- data_cat[,c(1:8,10:18,9)]
+
+
+# Taking only the categorical columns
+cat <- data_cat[,2:17]
+
+
+
+# Casting all categorical values to binary columns
+mod <- model.matrix(~ . + 0, data=cat, contrasts.arg = lapply(cat, contrasts, contrasts=FALSE))
+mod <- as.data.frame.matrix(mod)
+
+mod_comb <- cbind(data_cat$id,mod,data_cat$cancel)
+colnames(mod_comb)[1] <- "id"
+colnames(mod_comb)[286] <- "cancel"
+
+
+# Final
+final <- cbind(mod_comb,data[,c(10,15:17,19:22)])
+colnames(final)
+temp <- lapply(final[,2:286],as.factor)
+final <- cbind(final[,1],temp,final[,287:294])
+colnames(final)[1] <- "id"
+colnames(final)[286] <- "cancel"
+final <- cbind(final,cat)
+
+df <- as.data.frame(colnames(final))
+
+colnames(final)
+
+final <- cbind(final, data$ni.ageZscore, data$len.at.resZscore)
+
+colnames(final)[311:312] <- c("ni.ageZscore", "len.at.resZscore")
+
+```
+
+# Stratified Sampling
+
+```{r}
+
+library(dplyr)
+set.seed(1)
+train <- final %>%
+  group_by(cancel) %>%
+  sample_frac(0.6)
+
+rem <- final[!(final$id %in% train$id),]
+
+set.seed(1)
+val <- rem %>%
+  group_by(cancel) %>%
+  sample_frac(0.5)
+
+prop.table(table(val$cancel))
+
+test <-rem[!(rem$id %in% val$id),]
+
+prop.table(table(test$cancel))
+train$validation<-"Train"
+test$validation<-"Test"
+val$validation<-"Validation"
+
+
+```
+
+
+
+
+
+# Logistic Regression
+```{r}
+unique(train$sales.channel)
+class(train$sales.channel)
+train[,'sales.channel'] <- as.numeric((train[,'sales.channel']))
+val[,'sales.channel'] <- as.numeric(factor(val[,'sales.channel']))
+test[,'sales.channel'] <- as.numeric(factor(test[,'sales.channel']))
+
+train[,'year'] <- as.numeric(factor(train[,'year']))
+val[,'year'] <- as.numeric(factor(val[,'year']))
+test[,'year'] <- as.numeric(factor(test[,'year']))
+
+train[,'credit'] <- as.numeric(factor(train[,'credit']))
+val[,'credit'] <- as.numeric(factor(val[,'credit']))
+test[,'credit'] <- as.numeric(factor(test[,'credit']))
+
+model1 <- glm(cancel ~ claim.ind+n.adults+n.children+ni.marital.status+creditlow+creditmedium+len.at.resZscore+ni.ageZscore+sales.channelBroker+sales.channelOnline+sales.channelPhone,data = train)
+
+summary(model1)
+
+# Testing AUC for Validation dataset
+library(pROC)
+predictions <-  predict(model1,val,type = "response")
+roc_curve <- roc(val$cancel, predictions)
+auc(roc_curve)
+
+#  Testing AUC for Test dataset
+predictions <-  predict(model1,test,type = "response")
+roc_curve <- roc(test$cancel, predictions)
+auc(roc_curve)
+
+```
+
+
+
+
+```{r}
+
+# Building GBM Model
+library("gbm")
+
+# Taking only the significant variables identified through logistic regression model
+new_train <- train[,c(4:6,14:15,286,291,293:294,302:305)]
+
+GB <- gbm(cancel ~ claim.ind+n.adults+n.children+ni.marital.status+creditlow+creditmedium+len.at.resZscore+ni.ageZscore+sales.channelBroker+sales.channelOnline+sales.channelPhone, 
+    data=new_train,
+    distribution = "bernoulli",
+    cv.folds = 2,
+    n.trees = 10000,
+    shrinkage=0.05,
+    interaction.depth=2
+    )
+gbm.perf(GB)
+
+
+# Testing GBM Model on Validation dataset
+
+predictions <-  predict(GB,val,type = "response")
+roc_curve <- roc(val$cancel, predictions)
+auc(roc_curve)
+
+
+# Testing GBM Model on Test dataset
+
+predictions <-  predict(GB,test,type = "response")
+roc_curve <- roc(test$cancel, predictions)
+auc(roc_curve)
+```
+
+
+
+
+```{r}
+
+# Scoring Test Model
+ActualTest <- read.csv('E:/Projects/Travellers/2017travelerscasecompetition/final_test.csv')
+
+ActualTest[,'sales.channel'] <- as.numeric(factor(ActualTest[,'sales.channel']))
+ActualTest[,'year'] <- as.numeric(factor(ActualTest[,'year']))
+ActualTest[,'credit'] <- as.numeric(factor(ActualTest[,'credit']))
+
+predictions_GBM <-  predict(GB,ActualTest,type = "response")
+
+Final_submission <- cbind(ActualTest[,"id"],predictions_GBM)
+colnames(Final_submission)[1] <- "id"
+
+write.csv(Final_submission,"final_submission.csv",row.names = FALSE)
+
+```
+
