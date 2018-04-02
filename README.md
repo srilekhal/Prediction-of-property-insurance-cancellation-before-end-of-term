@@ -1,2 +1,2 @@
 # Prediction-of-property-insurance-cancellation-before-end-of-term
-Predicted customers who are likely to cancel property insurance policies before the end of the term by implementing Gradient Boosting
+Determined the propensity of cancellation of property insurance policies before term end using Gradient Boosting in R with 67% AUC
